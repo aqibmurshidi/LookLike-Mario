@@ -1,10 +1,10 @@
 // Game Configuration
 const GAME_CONFIG = {
-    GRAVITY: 0.6,
-    JUMP_STRENGTH: 12,
-    MAX_FALL_SPEED: 15,
-    PLAYER_SPEED: 5,
-    ANIMATION_SPEED: 0.1
+    GRAVITY: 0.5,
+    JUMP_STRENGTH: 13,
+    MAX_FALL_SPEED: 16,
+    PLAYER_SPEED: 6,
+    ANIMATION_SPEED: 0.15
 };
 
 // Game Classes
@@ -12,14 +12,15 @@ class Player {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.width = 30;
-        this.height = 40;
+        this.width = 32;
+        this.height = 48;
         this.velocityY = 0;
         this.velocityX = 0;
         this.isJumping = false;
         this.direction = 1; // 1 for right, -1 for left
         this.animationCounter = 0;
         this.animationFrame = 0;
+        this.isMoving = false;
     }
 
     update(platforms, enemies) {
@@ -54,7 +55,7 @@ class Player {
                 if (this.velocityY > 0 && this.y + this.height - this.velocityY <= enemy.y + 10) {
                     // Jumped on enemy
                     enemy.defeated = true;
-                    this.velocityY = -8;
+                    this.velocityY = -10;
                     this.isJumping = true;
                     game.score += 100;
                 } else {
@@ -70,10 +71,14 @@ class Player {
         }
 
         // Animation
-        this.animationCounter += GAME_CONFIG.ANIMATION_SPEED;
-        if (this.animationCounter >= 1) {
-            this.animationCounter = 0;
-            this.animationFrame = (this.animationFrame + 1) % 2;
+        if (this.isMoving) {
+            this.animationCounter += GAME_CONFIG.ANIMATION_SPEED;
+            if (this.animationCounter >= 1) {
+                this.animationCounter = 0;
+                this.animationFrame = (this.animationFrame + 1) % 4;
+            }
+        } else {
+            this.animationFrame = 0;
         }
     }
 
@@ -105,44 +110,99 @@ class Player {
     moveLeft() {
         this.velocityX = -GAME_CONFIG.PLAYER_SPEED;
         this.direction = -1;
+        this.isMoving = true;
     }
 
     moveRight() {
         this.velocityX = GAME_CONFIG.PLAYER_SPEED;
         this.direction = 1;
+        this.isMoving = true;
     }
 
     stopMoving() {
         this.velocityX = 0;
+        this.isMoving = false;
     }
 
     draw(ctx) {
         ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y);
         
-        // Draw player body
-        ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.direction === -1) {
+            ctx.scale(-1, 1);
+        }
+        
+        ctx.translate(-(this.width / 2), 0);
 
-        // Draw head (circular)
+        // Draw legs
+        const legFrames = [0, 2, 1, 2]; // Leg animation frames
+        const legFrame = legFrames[this.animationFrame % 4];
+        
+        ctx.fillStyle = '#8B4513'; // Brown
+        if (legFrame === 0) {
+            // Left leg forward
+            ctx.fillRect(8, 40, 6, 8);
+            ctx.fillRect(18, 35, 6, 8);
+        } else if (legFrame === 1) {
+            // Right leg forward
+            ctx.fillRect(8, 35, 6, 8);
+            ctx.fillRect(18, 40, 6, 8);
+        } else {
+            // Both legs neutral
+            ctx.fillRect(8, 38, 6, 8);
+            ctx.fillRect(18, 38, 6, 8);
+        }
+
+        // Draw body
+        ctx.fillStyle = '#DD0000'; // Bright red
+        ctx.fillRect(6, 24, 20, 16);
+        
+        // Draw collar area
+        ctx.fillStyle = '#FFD700'; // Gold buttons
+        ctx.fillRect(10, 24, 4, 4);
+        ctx.fillRect(18, 24, 4, 4);
+
+        // Draw arms
+        const armFrames = [0, 1, 0, -1];
+        const armOffset = armFrames[this.animationFrame % 4] * 3;
+        
+        ctx.fillStyle = '#FFD1A3'; // Skin tone
+        ctx.fillRect(4, 26 + armOffset, 4, 12);
+        ctx.fillRect(26, 26 - armOffset, 4, 12);
+
+        // Draw head
         ctx.fillStyle = '#FFD1A3';
         ctx.beginPath();
-        ctx.arc(this.x + this.width / 2, this.y - 10, 12, 0, Math.PI * 2);
+        ctx.arc(16, 16, 10, 0, Math.PI * 2);
         ctx.fill();
 
-        // Draw eyes
-        ctx.fillStyle = '#000000';
-        let eyeOffset = this.animationFrame * 3;
-        ctx.fillRect(this.x + 8, this.y - 12 + eyeOffset, 4, 6);
-        ctx.fillRect(this.x + 18, this.y - 12 + eyeOffset, 4, 6);
+        // Draw hat
+        ctx.fillStyle = '#DD0000';
+        ctx.fillRect(8, 8, 16, 8);
+        ctx.fillRect(6, 10, 20, 2);
 
-        // Draw jumping indicator
-        if (this.isJumping) {
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(this.x + this.width / 2, this.y - 8, 15, 0, Math.PI * 2);
-            ctx.stroke();
-        }
+        // Draw "M" on hat
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 8px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('M', 16, 15);
+
+        // Draw face
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(13, 14, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(19, 14, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw mustache
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(16, 17, 3, 0, Math.PI);
+        ctx.stroke();
 
         ctx.restore();
     }
@@ -158,6 +218,7 @@ class Platform {
         this.moveSpeed = 2;
         this.moveRange = 100;
         this.originalX = x;
+        this.animationFrame = 0;
     }
 
     update() {
@@ -167,42 +228,102 @@ class Platform {
                 this.moveSpeed *= -1;
             }
         }
+        this.animationFrame = (this.animationFrame + 1) % 60;
     }
 
     draw(ctx) {
-        if (this.type === 'final') {
-            ctx.fillStyle = '#FFD700';
-        } else if (this.type === 'moving') {
-            ctx.fillStyle = '#00AA00';
-        } else {
-            ctx.fillStyle = '#8B4513';
-        }
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.save();
 
-        // Draw border
-        ctx.strokeStyle = '#654321';
+        if (this.type === 'final') {
+            // Castle/flagpole - golden
+            ctx.fillStyle = '#DAA520';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            // Draw brick pattern
+            for (let i = 0; i < this.width; i += 16) {
+                for (let j = 0; j < this.height; j += 16) {
+                    ctx.strokeStyle = '#B8860B';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(this.x + i, this.y + j, 16, 16);
+                }
+            }
+            
+            // Draw flag
+            const flagX = this.x + this.width / 2;
+            const flagY = this.y - 30;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(flagX, flagY);
+            ctx.lineTo(flagX, this.y);
+            ctx.stroke();
+            
+            // Flag with waving animation
+            const wave = Math.sin(this.animationFrame * 0.1) * 3;
+            ctx.fillStyle = '#FF0000';
+            ctx.beginPath();
+            ctx.moveTo(flagX, flagY);
+            ctx.lineTo(flagX + 25 + wave, flagY + 10);
+            ctx.lineTo(flagX + 25 + wave, flagY - 10);
+            ctx.closePath();
+            ctx.fill();
+
+        } else if (this.type === 'moving') {
+            // Green moving platform
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            // Brick pattern
+            for (let i = 0; i < this.width; i += 16) {
+                for (let j = 0; j < this.height; j += 16) {
+                    ctx.strokeStyle = '#1a6b1a';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(this.x + i, this.y + j, 16, 16);
+                }
+            }
+            
+            // Arrow to show movement
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('↔', this.x + this.width / 2, this.y + this.height / 2 + 4);
+        } else {
+            // Normal brick platform (brown)
+            ctx.fillStyle = '#CD853F';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            
+            // Draw brick pattern
+            for (let i = 0; i < this.width; i += 16) {
+                for (let j = 0; j < this.height; j += 16) {
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(this.x + i + 1, this.y + j + 1, 14, 14);
+                    
+                    // Brick details (lighter shade)
+                    ctx.strokeStyle = '#A0522D';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(this.x + i + 2, this.y + j + 2, 12, 12);
+                }
+            }
+        }
+
+        // Border shadow for depth
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.lineWidth = 2;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-        // Draw pattern
-        if (this.type === 'final') {
-            ctx.fillStyle = '#FF6B6B';
-            ctx.font = 'bold 20px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('🚩', this.x + this.width / 2, this.y + this.height / 2 + 8);
-        }
+        ctx.restore();
     }
 }
 
 class Enemy {
-    constructor(x, y, width = 25, height = 25) {
+    constructor(x, y, width = 32, height = 32) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.speed = 2;
         this.direction = 1;
-        this.moveRange = 80;
+        this.moveRange = 100;
         this.originalX = x;
         this.defeated = false;
         this.animationCounter = 0;
@@ -222,21 +343,66 @@ class Enemy {
         if (this.defeated) return;
 
         ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y);
         
-        // Draw enemy body
-        ctx.fillStyle = '#00AA00';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        if (this.direction === -1) {
+            ctx.scale(-1, 1);
+        }
+        
+        ctx.translate(-(this.width / 2), 0);
 
-        // Draw eyes
+        // Draw Goomba-style enemy
+        // Body (brown)
+        ctx.fillStyle = '#8B4513';
+        ctx.beginPath();
+        ctx.ellipse(16, 24, 14, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Head (darker brown)
+        ctx.fillStyle = '#654321';
+        ctx.beginPath();
+        ctx.ellipse(16, 14, 12, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(this.x + 4, this.y + 4, 6, 6);
-        ctx.fillRect(this.x + 15, this.y + 4, 6, 6);
+        ctx.fillRect(10, 10, 4, 5);
+        ctx.fillRect(22, 10, 4, 5);
 
-        // Draw pupils (animated)
+        // Pupils (animated)
         ctx.fillStyle = '#000000';
         let pupilOffset = Math.sin(this.animationCounter) * 2;
-        ctx.fillRect(this.x + 5 + pupilOffset, this.y + 5, 4, 4);
-        ctx.fillRect(this.x + 16 + pupilOffset, this.y + 5, 4, 4);
+        ctx.fillRect(11 + pupilOffset, 11, 2, 3);
+        ctx.fillRect(23 + pupilOffset, 11, 2, 3);
+
+        // Eyebrows (angry)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(9, 9);
+        ctx.lineTo(12, 8);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(20, 9);
+        ctx.lineTo(23, 8);
+        ctx.stroke();
+
+        // Mouth (frown)
+        ctx.beginPath();
+        ctx.arc(16, 15, 3, 0, Math.PI);
+        ctx.stroke();
+
+        // Spikes on back
+        ctx.fillStyle = '#654321';
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(10 + i * 6, 14);
+            ctx.lineTo(12 + i * 6, 8);
+            ctx.lineTo(14 + i * 6, 14);
+            ctx.closePath();
+            ctx.fill();
+        }
 
         ctx.restore();
     }
@@ -507,12 +673,18 @@ class Game {
     }
 
     draw() {
-        // Clear canvas
-        this.ctx.fillStyle = '#87CEEB';
+        // Clear canvas with gradient sky
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.height);
+        gradient.addColorStop(0, '#87CEEB'); // Light blue top
+        gradient.addColorStop(1, '#E0F6FF'); // Lighter blue bottom
+        this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.width, this.height);
 
-        // Draw clouds (visual effect)
+        // Draw clouds
         this.drawClouds();
+
+        // Draw hills/background
+        this.drawHills();
 
         // Draw game objects
         this.platforms.forEach(p => p.draw(this.ctx));
@@ -521,20 +693,59 @@ class Game {
     }
 
     drawClouds() {
+        const time = Date.now() * 0.0001;
         const clouds = [
-            { x: 50, y: 50 },
-            { x: 300, y: 80 },
-            { x: 600, y: 60 }
+            { x: 50 + Math.sin(time) * 30, y: 50 },
+            { x: 300 + Math.sin(time + 2) * 40, y: 80 },
+            { x: 600 + Math.sin(time + 4) * 30, y: 60 }
         ];
 
         clouds.forEach(cloud => {
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             this.ctx.beginPath();
             this.ctx.arc(cloud.x, cloud.y, 20, 0, Math.PI * 2);
             this.ctx.arc(cloud.x + 25, cloud.y - 10, 25, 0, Math.PI * 2);
             this.ctx.arc(cloud.x + 50, cloud.y, 20, 0, Math.PI * 2);
             this.ctx.fill();
+            
+            // Cloud shadow
+            this.ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.arc(cloud.x + 2, cloud.y + 2, 18, 0, Math.PI * 2);
+            this.ctx.arc(cloud.x + 27, cloud.y - 8, 23, 0, Math.PI * 2);
+            this.ctx.arc(cloud.x + 52, cloud.y + 2, 18, 0, Math.PI * 2);
+            this.ctx.fill();
         });
+    }
+
+    drawHills() {
+        // Green hills in background
+        this.ctx.fillStyle = '#228B22';
+        this.ctx.beginPath();
+        this.ctx.ellipse(150, 400, 120, 80, 0, 0, Math.PI);
+        this.ctx.fill();
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(500, 420, 100, 70, 0, 0, Math.PI);
+        this.ctx.fill();
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(700, 410, 110, 75, 0, 0, Math.PI);
+        this.ctx.fill();
+
+        // Darker shade for depth
+        this.ctx.fillStyle = '#1a6b1a';
+        this.ctx.beginPath();
+        this.ctx.ellipse(150, 395, 100, 60, 0, 0, Math.PI);
+        this.ctx.fill();
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(500, 415, 80, 50, 0, 0, Math.PI);
+        this.ctx.fill();
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(700, 405, 90, 60, 0, 0, Math.PI);
+        this.ctx.fill();
     }
 
     loseLife() {
