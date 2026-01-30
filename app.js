@@ -4,7 +4,11 @@ const GAME_CONFIG = {
     JUMP_STRENGTH: 13,
     MAX_FALL_SPEED: 16,
     PLAYER_SPEED: 6,
-    ANIMATION_SPEED: 0.15
+    ANIMATION_SPEED: 0.15,
+    CAMERA_LERP: 0.08,
+    CHUNK_WIDTH: 900,
+    GROUND_Y: 550,
+    GROUND_HEIGHT: 50
 };
 
 // Game Classes
@@ -32,9 +36,8 @@ class Player {
         this.x += this.velocityX;
         this.y += this.velocityY;
 
-        // Keep player in bounds (horizontal)
+        // Keep player in bounds (left edge only for endless world)
         if (this.x < 0) this.x = 0;
-        if (this.x + this.width > 800) this.x = 800 - this.width;
 
         // Collision detection with platforms
         let isOnPlatform = false;
@@ -57,7 +60,7 @@ class Player {
                     enemy.defeated = true;
                     this.velocityY = -10;
                     this.isJumping = true;
-                    game.score += 100;
+                    game.enemyScore += 100;
                 } else {
                     // Hit by enemy
                     game.loseLife();
@@ -316,12 +319,12 @@ class Platform {
 }
 
 class Enemy {
-    constructor(x, y, width = 32, height = 32) {
+    constructor(x, y, width = 32, height = 32, speed = 2) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
-        this.speed = 2;
+        this.speed = speed;
         this.direction = 1;
         this.moveRange = 100;
         this.originalX = x;
@@ -418,12 +421,18 @@ class Game {
         this.player = null;
         this.platforms = [];
         this.enemies = [];
+        this.enemyScore = 0;
         this.score = 0;
         this.lives = 3;
-        this.currentLevel = 1;
         this.gameOver = false;
         this.gameWon = false;
         this.levelWon = false;
+
+        // Endless world state
+        this.cameraX = 0;
+        this.nextSpawnX = 0;
+        this.lastSafeX = 50;
+        this.lastSafeY = 480;
         
         this.keys = {
             left: false,
@@ -431,133 +440,123 @@ class Game {
             jump: false
         };
 
-        // Level designs: each level with platforms and enemies
-        this.levels = [
-            // Level 1 - Easy
-            {
-                platforms: [
-                    new Platform(0, 550, 800, 50, 'normal'), // Ground
-                    new Platform(100, 480, 150, 20, 'normal'),
-                    new Platform(350, 430, 150, 20, 'normal'),
-                    new Platform(600, 480, 150, 20, 'normal'),
-                    new Platform(250, 320, 150, 20, 'normal'),
-                    new Platform(500, 250, 200, 20, 'final')
-                ],
-                enemies: [
-                    new Enemy(100, 450),
-                    new Enemy(350, 400)
-                ]
-            },
-            // Level 2 - Easy-Medium
-            {
-                platforms: [
-                    new Platform(0, 550, 800, 50, 'normal'), // Ground
-                    new Platform(50, 470, 120, 20, 'normal'),
-                    new Platform(250, 430, 120, 20, 'normal'),
-                    new Platform(450, 470, 120, 20, 'moving'),
-                    new Platform(650, 420, 120, 20, 'normal'),
-                    new Platform(200, 320, 150, 20, 'normal'),
-                    new Platform(550, 280, 150, 20, 'normal'),
-                    new Platform(300, 150, 200, 20, 'final')
-                ],
-                enemies: [
-                    new Enemy(250, 400),
-                    new Enemy(450, 440),
-                    new Enemy(200, 290)
-                ]
-            },
-            // Level 3 - Medium
-            {
-                platforms: [
-                    new Platform(0, 550, 800, 50, 'normal'), // Ground
-                    new Platform(100, 480, 100, 20, 'normal'),
-                    new Platform(300, 450, 120, 20, 'moving'),
-                    new Platform(550, 480, 100, 20, 'normal'),
-                    new Platform(150, 360, 120, 20, 'normal'),
-                    new Platform(450, 330, 120, 20, 'moving'),
-                    new Platform(300, 220, 120, 20, 'normal'),
-                    new Platform(650, 200, 100, 20, 'normal'),
-                    new Platform(250, 80, 200, 20, 'final')
-                ],
-                enemies: [
-                    new Enemy(300, 420),
-                    new Enemy(550, 450),
-                    new Enemy(150, 330),
-                    new Enemy(450, 300)
-                ]
-            },
-            // Level 4 - Medium-Hard
-            {
-                platforms: [
-                    new Platform(0, 550, 800, 50, 'normal'), // Ground
-                    new Platform(80, 490, 100, 20, 'normal'),
-                    new Platform(280, 460, 100, 20, 'moving'),
-                    new Platform(520, 490, 100, 20, 'normal'),
-                    new Platform(700, 430, 80, 20, 'normal'),
-                    new Platform(150, 380, 100, 20, 'normal'),
-                    new Platform(400, 340, 100, 20, 'moving'),
-                    new Platform(650, 300, 100, 20, 'normal'),
-                    new Platform(200, 240, 120, 20, 'normal'),
-                    new Platform(500, 200, 120, 20, 'moving'),
-                    new Platform(300, 100, 200, 20, 'final')
-                ],
-                enemies: [
-                    new Enemy(280, 430),
-                    new Enemy(520, 460),
-                    new Enemy(150, 350),
-                    new Enemy(400, 310),
-                    new Enemy(200, 210)
-                ]
-            },
-            // Level 5 - Hard
-            {
-                platforms: [
-                    new Platform(0, 550, 800, 50, 'normal'), // Ground
-                    new Platform(70, 500, 80, 20, 'normal'),
-                    new Platform(250, 480, 90, 20, 'moving'),
-                    new Platform(500, 510, 80, 20, 'normal'),
-                    new Platform(720, 470, 80, 20, 'normal'),
-                    new Platform(150, 420, 90, 20, 'moving'),
-                    new Platform(380, 390, 90, 20, 'normal'),
-                    new Platform(650, 360, 90, 20, 'moving'),
-                    new Platform(50, 300, 100, 20, 'normal'),
-                    new Platform(300, 270, 100, 20, 'moving'),
-                    new Platform(550, 300, 100, 20, 'normal'),
-                    new Platform(200, 180, 120, 20, 'normal'),
-                    new Platform(500, 140, 120, 20, 'moving'),
-                    new Platform(350, 50, 200, 20, 'final')
-                ],
-                enemies: [
-                    new Enemy(250, 450),
-                    new Enemy(500, 480),
-                    new Enemy(150, 390),
-                    new Enemy(380, 360),
-                    new Enemy(650, 330),
-                    new Enemy(300, 240),
-                    new Enemy(200, 150)
-                ]
-            }
-        ];
-
-        this.setupLevel();
+        this.setupEndlessWorld();
         this.setupControls();
     }
 
-    setupLevel() {
-        const levelIndex = Math.min(this.currentLevel - 1, this.levels.length - 1);
-        const levelData = this.levels[levelIndex];
-        
-        this.platforms = levelData.platforms.map(p => 
-            new Platform(p.x, p.y, p.width, p.height, p.type)
+    rectsOverlap(a, b, padding = 0) {
+        return (
+            a.x < b.x + b.width + padding &&
+            a.x + a.width + padding > b.x &&
+            a.y < b.y + b.height + padding &&
+            a.y + a.height + padding > b.y
         );
-        
-        this.enemies = levelData.enemies.map(e => 
-            new Enemy(e.x, e.y, e.width, e.height)
-        );
+    }
+
+    getPlatformsAtX(x) {
+        return this.platforms.filter(p => x >= p.x && x <= p.x + p.width);
+    }
+
+    getDifficulty() {
+        const distance = this.player ? this.player.x : 0;
+        const level = Math.floor(distance / 1200);
+        return Math.min(6, level);
+    }
+
+    setupEndlessWorld() {
+        this.platforms = [];
+        this.enemies = [];
+        this.enemyScore = 0;
+        this.score = 0;
+        this.cameraX = 0;
+        this.nextSpawnX = 0;
+        this.lastSafeX = 50;
+        this.lastSafeY = 480;
 
         // Create player
         this.player = new Player(50, 480);
-        this.levelWon = false;
+
+        // Generate initial chunks
+        for (let i = 0; i < 3; i++) {
+            this.generateChunk(this.nextSpawnX);
+            this.nextSpawnX += GAME_CONFIG.CHUNK_WIDTH;
+        }
+    }
+
+    generateChunk(startX, difficulty = 0) {
+        const endX = startX + GAME_CONFIG.CHUNK_WIDTH;
+
+        // Ground segments with gaps
+        let x = startX;
+        const minGround = 120;
+        const maxGround = 260;
+        const minGap = 40 + difficulty * 6;
+        const maxGap = 140 + difficulty * 8;
+
+        let firstSegment = true;
+        while (x < endX) {
+            const groundLength = Math.floor(Math.random() * (maxGround - minGround)) + minGround;
+            const gapLength = Math.floor(Math.random() * (maxGap - minGap)) + minGap;
+
+            const segmentLength = firstSegment ? Math.max(200, groundLength) : groundLength;
+            this.platforms.push(
+                new Platform(x, GAME_CONFIG.GROUND_Y, segmentLength, GAME_CONFIG.GROUND_HEIGHT, 'normal')
+            );
+
+            x += segmentLength + (firstSegment ? 0 : gapLength);
+            firstSegment = false;
+        }
+
+        // Floating platforms (avoid overlaps)
+        const platformCount = 3 + Math.floor(Math.random() * 3) + Math.floor(difficulty * 0.5);
+        for (let i = 0; i < platformCount; i++) {
+            let placed = false;
+            for (let attempt = 0; attempt < 30 && !placed; attempt++) {
+                const width = 80 + Math.floor(Math.random() * 100);
+                const px = startX + 80 + Math.floor(Math.random() * (GAME_CONFIG.CHUNK_WIDTH - 160));
+                const py = 240 + Math.floor(Math.random() * 220);
+                const type = Math.random() < 0.3 + difficulty * 0.05 ? 'moving' : 'normal';
+                const candidate = { x: px, y: py, width, height: 20 };
+
+                const overlaps = this.platforms.some(p => this.rectsOverlap(candidate, p, 6));
+                if (!overlaps) {
+                    this.platforms.push(new Platform(px, py, width, 20, type));
+                    placed = true;
+                }
+            }
+        }
+
+        // Enemies
+        const enemyCount = 2 + Math.floor(Math.random() * 3) + Math.floor(difficulty * 0.8);
+        for (let i = 0; i < enemyCount; i++) {
+            let placed = false;
+            for (let attempt = 0; attempt < 30 && !placed; attempt++) {
+                const ex = startX + 120 + Math.floor(Math.random() * (GAME_CONFIG.CHUNK_WIDTH - 240));
+                const onGround = Math.random() < 0.7;
+
+                let surface = null;
+                if (onGround) {
+                    surface = this.getPlatformsAtX(ex).find(p => p.y === GAME_CONFIG.GROUND_Y);
+                } else {
+                    const candidates = this.getPlatformsAtX(ex).filter(p => p.y < GAME_CONFIG.GROUND_Y);
+                    if (candidates.length) {
+                        surface = candidates[Math.floor(Math.random() * candidates.length)];
+                    }
+                }
+
+                if (!surface) continue;
+
+                const ey = surface.y - 32;
+                const enemyRect = { x: ex, y: ey, width: 32, height: 32 };
+                const overlaps = this.platforms.some(p => p !== surface && this.rectsOverlap(enemyRect, p, 1));
+
+                if (!overlaps) {
+                    const speed = 2 + difficulty * 0.25 + Math.random() * 0.5;
+                    this.enemies.push(new Enemy(ex, ey, 32, 32, speed));
+                    placed = true;
+                }
+            }
+        }
     }
 
     setupControls() {
@@ -632,7 +631,7 @@ class Game {
     }
 
     update() {
-        if (this.gameOver || this.gameWon || this.levelWon) return;
+        if (this.gameOver) return;
 
         // Handle player input
         if (this.keys.left) {
@@ -653,21 +652,45 @@ class Game {
         this.platforms.forEach(p => p.update());
         this.enemies.forEach(e => e.update());
 
+        // Update checkpoint when safely on a platform
+        const feetY = this.player.y + this.player.height;
+        if (this.player.velocityY === 0) {
+            const standingOn = this.platforms.find(p =>
+                this.player.x + this.player.width > p.x &&
+                this.player.x < p.x + p.width &&
+                Math.abs(feetY - p.y) <= 2
+            );
+            if (standingOn) {
+                this.lastSafeX = this.player.x;
+                this.lastSafeY = standingOn.y - this.player.height;
+            }
+        }
+
         // Remove defeated enemies
         this.enemies = this.enemies.filter(e => !e.defeated);
 
-        // Check win condition
-        const flagPlatform = this.platforms.find(p => p.type === 'final');
-        if (flagPlatform && 
-            this.player.x + this.player.width > flagPlatform.x &&
-            this.player.x < flagPlatform.x + flagPlatform.width &&
-            this.player.y + this.player.height > flagPlatform.y &&
-            this.player.y < flagPlatform.y + flagPlatform.height) {
-            this.completeLevel();
+        // Camera follow
+        const targetX = this.player.x - this.width * 0.35;
+        this.cameraX += (targetX - this.cameraX) * GAME_CONFIG.CAMERA_LERP;
+        if (this.cameraX < 0) this.cameraX = 0;
+
+        // Spawn new chunks as player moves right
+        const difficulty = this.getDifficulty();
+        while (this.nextSpawnX < this.cameraX + this.width * 2) {
+            this.generateChunk(this.nextSpawnX, difficulty);
+            this.nextSpawnX += GAME_CONFIG.CHUNK_WIDTH;
         }
 
+        // Cleanup old platforms/enemies
+        const cleanupX = this.cameraX - 300;
+        this.platforms = this.platforms.filter(p => p.x + p.width > cleanupX);
+        this.enemies = this.enemies.filter(e => e.x + e.width > cleanupX);
+
+        // Score: distance + enemy score
+        this.score = Math.max(this.score, Math.floor(this.player.x / 10) + this.enemyScore);
+
         // Update UI
-        document.getElementById('level').textContent = this.currentLevel;
+        document.getElementById('level').textContent = Math.floor(this.player.x);
         document.getElementById('score').textContent = this.score;
         document.getElementById('lives').textContent = this.lives;
     }
@@ -687,17 +710,22 @@ class Game {
         this.drawHills();
 
         // Draw game objects
+        this.ctx.save();
+        this.ctx.translate(-this.cameraX, 0);
         this.platforms.forEach(p => p.draw(this.ctx));
         this.enemies.forEach(e => e.draw(this.ctx));
         this.player.draw(this.ctx);
+        this.ctx.restore();
     }
 
     drawClouds() {
         const time = Date.now() * 0.0001;
+        const offset = -(this.cameraX * 0.2) % this.width;
         const clouds = [
-            { x: 50 + Math.sin(time) * 30, y: 50 },
-            { x: 300 + Math.sin(time + 2) * 40, y: 80 },
-            { x: 600 + Math.sin(time + 4) * 30, y: 60 }
+            { x: 50 + Math.sin(time) * 30 + offset, y: 50 },
+            { x: 300 + Math.sin(time + 2) * 40 + offset, y: 80 },
+            { x: 600 + Math.sin(time + 4) * 30 + offset, y: 60 },
+            { x: 850 + Math.sin(time + 1) * 30 + offset, y: 70 }
         ];
 
         clouds.forEach(cloud => {
@@ -719,32 +747,33 @@ class Game {
     }
 
     drawHills() {
+        const offset = -(this.cameraX * 0.4) % this.width;
         // Green hills in background
         this.ctx.fillStyle = '#228B22';
         this.ctx.beginPath();
-        this.ctx.ellipse(150, 400, 120, 80, 0, 0, Math.PI);
+        this.ctx.ellipse(150 + offset, 400, 120, 80, 0, 0, Math.PI);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(500, 420, 100, 70, 0, 0, Math.PI);
+        this.ctx.ellipse(500 + offset, 420, 100, 70, 0, 0, Math.PI);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(700, 410, 110, 75, 0, 0, Math.PI);
+        this.ctx.ellipse(700 + offset, 410, 110, 75, 0, 0, Math.PI);
         this.ctx.fill();
 
         // Darker shade for depth
         this.ctx.fillStyle = '#1a6b1a';
         this.ctx.beginPath();
-        this.ctx.ellipse(150, 395, 100, 60, 0, 0, Math.PI);
+        this.ctx.ellipse(150 + offset, 395, 100, 60, 0, 0, Math.PI);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(500, 415, 80, 50, 0, 0, Math.PI);
+        this.ctx.ellipse(500 + offset, 415, 80, 50, 0, 0, Math.PI);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(700, 405, 90, 60, 0, 0, Math.PI);
+        this.ctx.ellipse(700 + offset, 405, 90, 60, 0, 0, Math.PI);
         this.ctx.fill();
     }
 
@@ -754,24 +783,9 @@ class Game {
             this.gameOver = true;
             this.showGameOver('Game Over!', 'No lives left! Final Score: ' + this.score);
         } else {
-            // Reset player position
-            this.player = new Player(50, 480);
-        }
-    }
-
-    completeLevel() {
-        this.levelWon = true;
-        this.score += 300;
-        
-        if (this.currentLevel < this.levels.length) {
-            this.showGameOver('Level ' + this.currentLevel + ' Complete! 🎉', 
-                             'Get ready for the next level!');
-            document.getElementById('restartBtn').textContent = 'Next Level';
-        } else {
-            this.gameWon = true;
-            this.showGameOver('🏆 ALL LEVELS COMPLETE! 🏆', 
-                             'You are a Mario Master! Final Score: ' + this.score);
-            document.getElementById('restartBtn').textContent = 'Play Again';
+            // Respawn at last checkpoint
+            this.player = new Player(this.lastSafeX, this.lastSafeY);
+            this.cameraX = Math.max(0, this.lastSafeX - this.width * 0.35);
         }
     }
 
@@ -782,25 +796,10 @@ class Game {
     }
 
     restart() {
-        if (this.gameWon) {
-            // Reset entire game
-            this.score = 0;
-            this.lives = 3;
-            this.currentLevel = 1;
-            this.gameOver = false;
-            this.gameWon = false;
-            this.levelWon = false;
-            document.getElementById('restartBtn').textContent = 'Next Level';
-        } else if (this.levelWon) {
-            // Go to next level
-            this.currentLevel++;
-            this.levelWon = false;
-        } else {
-            // Restart current level only
-            this.levelWon = false;
-        }
-        
-        this.setupLevel();
+        // Reset entire game
+        this.lives = 3;
+        this.gameOver = false;
+        this.setupEndlessWorld();
         document.getElementById('gameOverScreen').classList.add('hidden');
         game.gameLoop();
     }
@@ -809,7 +808,7 @@ class Game {
         this.update();
         this.draw();
 
-        if (!this.gameOver && !this.gameWon && !this.levelWon) {
+        if (!this.gameOver) {
             requestAnimationFrame(() => this.gameLoop());
         }
     }
